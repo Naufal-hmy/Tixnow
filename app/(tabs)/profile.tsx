@@ -49,7 +49,7 @@ export default function ProfileScreen() {
                     <SettingItem
                         icon="bookmark-outline"
                         title="Bookmark"
-                        onPress={() => router.push('/bookmark')}
+                        onPress={() => router.push('/bookmarks')}
                     />
                     <SettingItem
                         icon="logout"
