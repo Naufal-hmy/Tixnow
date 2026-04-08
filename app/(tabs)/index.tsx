@@ -1,7 +1,9 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
+import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   ScrollView,
@@ -12,6 +14,85 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../../lib/supabase';
+import { EventModel, eventService } from '../../services/eventService';
+// ... import lainnya sudah benar ...
+import { authService } from '../../services/authService'; // <--- Pastikan import ini ada
+
+export default function HomeScreen() {
+  // 1. STATE UNTUK CAROUSEL BANNER (Tetap sama)
+  const [activeBanner, setActiveBanner] = useState(0);
+  const banners = [
+    'https://picsum.photos/400/200?random=1',
+    'https://picsum.photos/400/200?random=2',
+    'https://picsum.photos/400/200?random=3',
+    'https://picsum.photos/400/200?random=4'
+  ];
+
+  // 2. STATE UNTUK DATA (DITAMBAH userName)
+  const [events, setEvents] = useState<EventModel[]>([]);
+  const [userName, setUserName] = useState<string>('Antigraviters'); // <--- BARU: Default name
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // 3. LOGIKA FETCH DATA (DITAMBAH Ambil Profil)
+  useEffect(() => {
+    const loadAllData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // A. AMBIL PROFIL USER (BARU)
+        const profile = await authService.getCurrentProfile();
+        if (profile?.full_name) {
+          setUserName(profile.full_name);
+        }
+
+        // B. AMBIL DATA EVENTS
+        const data = await eventService.getAllEvents();
+        setEvents(data);
+
+      } catch (err: any) {
+        setError(err.message || 'Gagal memuat data.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadAllData();
+  }, []);
+
+  // ... fungsi handleScroll dan filterOptions tetap sama ...
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+
+        <LinearGradient colors={['#52A3DB', '#FFFFFF']} style={styles.gradientHeader}>
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.greetingTitle}>Tixnow</Text>
+              {/* SEKARANG PAKAI VARIABLE userName (BARU) */}
+              <Text style={styles.greetingName}>Hallo {userName}</Text>
+            </View>
+            {/* ... sisa header icons tetap sama ... */}
+          </View>
+          {/* ... sisa search bar tetap sama ... */}
+        </LinearGradient>
+
+        {/* ... sisa konten Wallet, Banner, Kategori, dll tetap sama ... */}
+
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+// ... Sisanya ke bawah (CategoryItem, RecommendationCard, Styles) tetap sama ...
+
+// Di dalam fungsi Home() kamu, tambahkan ini:
+useEffect(() => {
+  console.log("Status Koneksi Supabase:", supabase ? "BERHASIL KONEK! ✅" : "GAGAL ❌");
+}, []);
 
 const { width } = Dimensions.get('window');
 
@@ -27,6 +108,30 @@ export default function HomeScreen() {
     'https://picsum.photos/400/200?random=3',
     'https://picsum.photos/400/200?random=4'
   ];
+
+  // 2. STATE UNTUK DATA EVENTS DARI SUPABASE
+  const [events, setEvents] = useState<EventModel[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Mengambil data saat layar Home dirender pertama kali
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        // Memanggil service untuk mengambil data event (Data Service Pattern)
+        const data = await eventService.getAllEvents();
+        setEvents(data);
+      } catch (err: any) {
+        setError(err.message || 'Gagal memuat data dari event server.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchEvents();
+  }, []);
 
   // Fungsi mendeteksi geseran carousel
   const handleScroll = (event) => {
@@ -160,10 +265,27 @@ export default function HomeScreen() {
 
         {/* Rekomendasi Cards */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recommendationContainer}>
-          {/* Card dipanggil 3 kali untuk contoh */}
-          <RecommendationCard />
-          <RecommendationCard />
-          <RecommendationCard />
+          {isLoading ? (
+            // Indikator loading saat memuat data events
+            <View style={{ width: width * 0.55, justifyContent: 'center', alignItems: 'center' }}>
+              <ActivityIndicator size="large" color="#1E88E5" />
+            </View>
+          ) : error ? (
+            // Menampilkan pesan error jika terjadi kegagalan fetching (Error Handling)
+            <View style={{ width: width * 0.55, justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ color: '#E53935', textAlign: 'center' }}>{error}</Text>
+            </View>
+          ) : events.length === 0 ? (
+            // Tampilan jika tabel event masih kosong di database
+            <View style={{ width: width * 0.55, justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ color: '#666', textAlign: 'center' }}>Belum ada event tersedia saat ini.</Text>
+            </View>
+          ) : (
+            // Merender array data aktual dari API Supabase
+            events.map((eventData) => (
+              <RecommendationCard key={eventData.id} event={eventData} />
+            ))
+          )}
         </ScrollView>
 
       </ScrollView>
@@ -182,17 +304,28 @@ const CategoryItem = ({ icon, title }) => (
 );
 
 // Komponen Card Konser (Sudah ditambahkan State untuk tombol Heart/Love)
-const RecommendationCard = () => {
+const RecommendationCard = ({ event }: { event?: EventModel }) => {
   const [isLiked, setIsLiked] = useState(false);
+
+  // Nilai fallbacks yang proper (Default parameters) jika dari API null
+  const displayTitle = event?.title || 'Cakra Khan: Symphony of giving';
+  const displayOrganizer = event?.organizer || 'Abogrup';
+  const displayDate = event?.date || '31 Desember 2025';
+  const displayOriginalPrice = event?.originalPrice ? `IDR ${event.originalPrice.toLocaleString('id-ID')}` : 'IDR 1.500.000';
+  const displayDiscountPrice = event?.discountPrice ? `IDR ${event.discountPrice.toLocaleString('id-ID')}` : 'IDR 1.000.000';
+  const displayCategory = event?.category || 'Musik';
+  const displayImage = event?.imageUrl || 'https://picsum.photos/300/200?random=5';
 
   return (
     // TAMBAHKAN DI SINI (Paling luar)
+    // Pastikan navigasi route expo dipassing dengan sesuai
     <TouchableOpacity
       style={styles.card}
       activeOpacity={0.9}
-      onPress={() => router.push('/event-detail')} // <--- Ini kuncinya
+      // Router path yang lebih dinamis untuk handling specific detail
+      onPress={() => router.push(event ? `/event-detail?id=${event.id}` : '/event-detail')}
     >
-      <Image source={{ uri: 'https://picsum.photos/300/200?random=5' }} style={styles.cardImage} />
+      <Image source={{ uri: displayImage }} style={styles.cardImage} />
 
       {/* Tombol Love - JANGAN DIUBAH, biarkan dia mengurus Like saja */}
       <TouchableOpacity
@@ -208,15 +341,15 @@ const RecommendationCard = () => {
 
       <View style={styles.cardCategoryBadge}>
         <MaterialCommunityIcons name="music-note" size={12} color="#666" />
-        <Text style={styles.cardCategoryText}>Musik</Text>
+        <Text style={styles.cardCategoryText}>{displayCategory}</Text>
       </View>
 
       <View style={styles.cardContent}>
-        <Text style={styles.cardTitle} numberOfLines={2}>Cakra Khan: Symphony of giving</Text>
-        <View style={styles.cardDetailRow}><MaterialCommunityIcons name="account" size={14} color="#666" /><Text style={styles.cardDetailText}>Abogrup</Text></View>
-        <View style={styles.cardDetailRow}><MaterialCommunityIcons name="calendar" size={14} color="#666" /><Text style={styles.cardDetailText}>31 Desember 2025</Text></View>
-        <Text style={styles.cardPriceStrike}>IDR 1.500.000</Text>
-        <Text style={styles.cardPrice}>IDR 1.000.000</Text>
+        <Text style={styles.cardTitle} numberOfLines={2}>{displayTitle}</Text>
+        <View style={styles.cardDetailRow}><MaterialCommunityIcons name="account" size={14} color="#666" /><Text style={styles.cardDetailText}>{displayOrganizer}</Text></View>
+        <View style={styles.cardDetailRow}><MaterialCommunityIcons name="calendar" size={14} color="#666" /><Text style={styles.cardDetailText}>{displayDate}</Text></View>
+        <Text style={styles.cardPriceStrike}>{displayOriginalPrice}</Text>
+        <Text style={styles.cardPrice}>{displayDiscountPrice}</Text>
       </View>
     </TouchableOpacity>
   );

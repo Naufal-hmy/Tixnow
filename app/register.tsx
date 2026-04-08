@@ -1,11 +1,51 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
+import { authService } from '../services/authService';
 
 export default function RegisterScreen() {
+    const [fullName, setFullName] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const handleRegister = async () => {
+        if (!email || !password || !fullName) {
+            Alert.alert('Error', 'Semua data wajib diisi!');
+            return;
+        }
+        if (password !== confirmPassword) {
+            Alert.alert('Error', 'Password tidak cocok!');
+            return;
+        }
+
+        setLoading(true);
+        const { data, error } = await authService.signUp(email, password, fullName);
+        setLoading(false);
+
+        if (error) {
+            Alert.alert('Gagal Daftar', error.message);
+        } else {
+            Alert.alert('Sukses', 'Akun berhasil dibuat! Silahkan masuk.', [
+                { text: 'OK', onPress: () => router.push('/login') }
+            ]);
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
@@ -18,23 +58,51 @@ export default function RegisterScreen() {
                     <View style={styles.formContainer}>
                         <View style={styles.inputWrapper}>
                             <MaterialCommunityIcons name="account-outline" size={20} color="#1E88E5" style={styles.inputIcon} />
-                            <TextInput style={styles.input} placeholder="Enter your name" />
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Enter your name"
+                                value={fullName}
+                                onChangeText={setFullName}
+                            />
                         </View>
                         <View style={styles.inputWrapper}>
                             <MaterialCommunityIcons name="email-outline" size={20} color="#1E88E5" style={styles.inputIcon} />
-                            <TextInput style={styles.input} placeholder="Enter your email" />
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Enter your email"
+                                value={email}
+                                onChangeText={setEmail}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                            />
                         </View>
                         <View style={styles.inputWrapper}>
                             <MaterialCommunityIcons name="lock-outline" size={20} color="#1E88E5" style={styles.inputIcon} />
-                            <TextInput style={styles.input} placeholder="Enter your Password" secureTextEntry={true} />
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Enter your Password"
+                                secureTextEntry={true}
+                                value={password}
+                                onChangeText={setPassword}
+                            />
                         </View>
                         <View style={styles.inputWrapper}>
                             <MaterialCommunityIcons name="lock-outline" size={20} color="#1E88E5" style={styles.inputIcon} />
-                            <TextInput style={styles.input} placeholder="Enter your confirmation password" secureTextEntry={true} />
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Enter your confirmation password"
+                                secureTextEntry={true}
+                                value={confirmPassword}
+                                onChangeText={setConfirmPassword}
+                            />
                         </View>
 
-                        <TouchableOpacity style={styles.registerButton} onPress={() => router.push('/login')}>
-                            <Text style={styles.registerButtonText}>Daftar</Text>
+                        <TouchableOpacity
+                            style={[styles.registerButton, loading && { backgroundColor: '#A0A0A0' }]}
+                            onPress={handleRegister}
+                            disabled={loading}
+                        >
+                            {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.registerButtonText}>Daftar</Text>}
                         </TouchableOpacity>
                     </View>
 
@@ -59,6 +127,7 @@ export default function RegisterScreen() {
     );
 }
 
+// STYLES DI LUAR FUNCTION (WAJIB)
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#FFFFFF' },
     scrollContainer: { flexGrow: 1, paddingHorizontal: 24, justifyContent: 'center', paddingBottom: 20 },
@@ -77,7 +146,7 @@ const styles = StyleSheet.create({
     googleButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#1E88E5', borderRadius: 8, height: 50, marginBottom: 30 },
     googleIcon: { marginRight: 10 },
     googleButtonText: { color: '#1E88E5', fontSize: 14, fontWeight: '600' },
-    footerContainer: { flexDirection: 'row', justifyContent: 'center', marginTop: 'auto' },
+    footerContainer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
     footerText: { fontSize: 13, color: '#1E88E5' },
     loginText: { fontWeight: 'bold' },
 });

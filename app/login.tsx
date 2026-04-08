@@ -1,14 +1,42 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router'; // WAJIB DITAMBAHKAN UNTUK PINDAH HALAMAN
+import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
+import { authService } from '../services/authService';
 
 export default function LoginScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    const handleLogin = async () => {
+        if (!email || !password) {
+            Alert.alert('Error', 'Email dan Password harus diisi!');
+            return;
+        }
+
+        setLoading(true);
+        const { data, error } = await authService.signIn(email, password);
+        setLoading(false);
+
+        if (error) {
+            Alert.alert('Gagal Masuk', error.message);
+        } else {
+            router.replace('/(tabs)');
+        }
+    }; // <--- TUTUP handleLogin DI SINI
 
     return (
         <SafeAreaView style={styles.container}>
@@ -21,25 +49,44 @@ export default function LoginScreen() {
                 <View style={styles.formContainer}>
                     <View style={styles.inputWrapper}>
                         <MaterialCommunityIcons name="email-outline" size={20} color="#1E88E5" style={styles.inputIcon} />
-                        <TextInput style={styles.input} placeholder="Enter your email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter your email"
+                            value={email}
+                            onChangeText={setEmail}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                        />
                     </View>
 
                     <View style={styles.inputWrapper}>
                         <MaterialCommunityIcons name="lock-outline" size={20} color="#1E88E5" style={styles.inputIcon} />
-                        <TextInput style={styles.input} placeholder="Enter your Password" value={password} onChangeText={setPassword} secureTextEntry={!showPassword} />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter your Password"
+                            value={password}
+                            onChangeText={setPassword}
+                            secureTextEntry={!showPassword}
+                        />
                         <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                             <MaterialCommunityIcons name={showPassword ? "eye-outline" : "eye-off-outline"} size={20} color="#A0A0A0" />
                         </TouchableOpacity>
                     </View>
 
-                    {/* Navigasi ke Lupa Password */}
                     <TouchableOpacity style={styles.forgotPasswordContainer} onPress={() => router.push('/forgot-password')}>
                         <Text style={styles.forgotPasswordText}>Lupa Password</Text>
                     </TouchableOpacity>
 
-                    {/* Navigasi ke Home (Tabs) nanti */}
-                    <TouchableOpacity style={styles.loginButton} onPress={() => router.replace('/(tabs)')}>
-                        <Text style={styles.loginButtonText}>Masuk</Text>
+                    <TouchableOpacity
+                        style={[styles.loginButton, loading && { backgroundColor: '#A0A0A0' }]}
+                        onPress={handleLogin}
+                        disabled={loading}
+                    >
+                        {loading ? (
+                            <ActivityIndicator color="#FFF" />
+                        ) : (
+                            <Text style={styles.loginButtonText}>Masuk</Text>
+                        )}
                     </TouchableOpacity>
                 </View>
 
@@ -54,7 +101,6 @@ export default function LoginScreen() {
 
                 <View style={styles.footerContainer}>
                     <Text style={styles.footerText}>Apakah anda belum punya akun? </Text>
-                    {/* Navigasi ke Register */}
                     <TouchableOpacity onPress={() => router.push('/register')}>
                         <Text style={[styles.footerText, styles.registerText]}>klik Daftar</Text>
                     </TouchableOpacity>
@@ -64,6 +110,7 @@ export default function LoginScreen() {
     );
 }
 
+// PINDAHKAN STYLES KE LUAR FUNCTION (Sangat Penting!)
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#FFFFFF' },
     innerContainer: { flex: 1, paddingHorizontal: 24, justifyContent: 'center' },
