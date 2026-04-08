@@ -23,7 +23,7 @@ export const authService = {
             .from('profiles')
             .select('*')
             .eq('id', user.id)
-            .single();
+            .maybeSingle();
 
         if (error) {
             console.error("Error ambil profil:", error.message);

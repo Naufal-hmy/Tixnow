@@ -1,7 +1,9 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
+    Alert,
     ScrollView,
     StyleSheet,
     Text,
@@ -9,115 +11,137 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../../lib/supabase';
+import { authService } from '../../services/authService';
 
 export default function ProfileScreen() {
+    const [profile, setProfile] = useState<any>(null);
+    const [email, setEmail] = useState<string>('');
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        loadUserData();
+    }, []);
+
+    const loadUserData = async () => {
+        try {
+            setLoading(true);
+            // 1. Ambil Email dari Auth
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) setEmail(user.email || '');
+
+            // 2. Ambil Nama & Role dari tabel Profiles
+            const userData = await authService.getCurrentProfile();
+            setProfile(userData);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleLogout = () => {
+        Alert.alert('Logout', 'Apakah kamu yakin ingin keluar?', [
+            { text: 'Batal', style: 'cancel' },
+            {
+                text: 'Keluar',
+                style: 'destructive',
+                onPress: async () => {
+                    await authService.signOut();
+                    router.replace('/login');
+                }
+            }
+        ]);
+    };
+
+    if (loading) {
+        return (
+            <View style={styles.centered}>
+                <ActivityIndicator size="large" color="#1E88E5" />
+            </View>
+        );
+    }
+
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
+        <SafeAreaView style={styles.container}>
             <ScrollView showsVerticalScrollIndicator={false}>
-
-                {/* Header Title */}
+                {/* Header Profil */}
                 <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Profil</Text>
-                </View>
-
-                {/* User Info Section */}
-                <View style={styles.profileSection}>
-                    <View style={styles.avatarPlaceholder}>
-                        <MaterialCommunityIcons name="account" size={50} color="#A0A0A0" />
+                    <View style={styles.avatarContainer}>
+                        <MaterialCommunityIcons name="account" size={60} color="#1E88E5" />
                     </View>
-                    <View style={styles.userInfo}>
-                        <Text style={styles.userName}>Dina Nur Auliana</Text>
-                        <Text style={styles.userEmail}>dinanr.aulia@gmail.com</Text>
-                        <Text style={styles.joinDate}>Bergabung sejak tanggal 11 November 2025</Text>
-                    </View>
+                    <Text style={styles.name}>{profile?.full_name || 'User Tikara'}</Text>
+                    <Text style={styles.email}>{email}</Text>
+                    {profile?.role === 'organizer' && (
+                        <View style={styles.organizerBadge}>
+                            <Text style={styles.organizerBadgeText}>OFFICIAL ORGANIZER</Text>
+                        </View>
+                    )}
                 </View>
 
-                {/* Settings Section */}
-                <View style={styles.settingsSection}>
-                    <Text style={styles.sectionTitle}>Pengaturan</Text>
+                <View style={styles.menuContainer}>
+                    <Text style={styles.menuTitle}>Akun Saya</Text>
 
-                    <SettingItem
-                        icon="account-edit-outline"
-                        title="Ubah Profil"
-                        onPress={() => router.push('/edit-profile')}
-                    />
-                    <SettingItem
-                        icon="history"
-                        title="Riwayat"
-                        onPress={() => router.push('/history')}
-                    />
-                    <SettingItem
-                        icon="bookmark-outline"
-                        title="Bookmark"
-                        onPress={() => router.push('/bookmarks')}
-                    />
-                    <SettingItem
-                        icon="logout"
-                        title="Logout"
-                        isLogout={true}
-                        onPress={() => router.replace('/login')}
-                    />
+                    <ProfileMenu icon="ticket-confirmation-outline" title="Tiket Saya" onPress={() => router.push('/my-tickets')} />
+                    <ProfileMenu icon="heart-outline" title="Favorit" onPress={() => { }} />
+
+                    {/* PANEL PENYELENGGARA: Muncul hanya jika role-nya organizer */}
+                    {profile?.role === 'organizer' && (
+                        <TouchableOpacity
+                            style={[styles.menuItem, { backgroundColor: '#E1F5FE', borderColor: '#B3E5FC', borderWidth: 1 }]}
+                            onPress={() => router.push('/create-event')}
+                        >
+                            <View style={styles.menuLeft}>
+                                <MaterialCommunityIcons name="plus-circle" size={22} color="#1E88E5" />
+                                <Text style={[styles.menuLabel, { color: '#1E88E5', fontWeight: 'bold' }]}>Panel Penyelenggara</Text>
+                            </View>
+                            <MaterialCommunityIcons name="chevron-right" size={20} color="#1E88E5" />
+                        </TouchableOpacity>
+                    )}
+
+                    <ProfileMenu icon="shield-check-outline" title="Keamanan Akun" onPress={() => { }} />
+                    <ProfileMenu icon="help-circle-outline" title="Pusat Bantuan" onPress={() => { }} />
+
+                    <View style={styles.divider} />
+
+                    <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                        <MaterialCommunityIcons name="logout" size={20} color="#E53935" />
+                        <Text style={styles.logoutText}>Keluar dari Akun</Text>
+                    </TouchableOpacity>
                 </View>
 
+                <Text style={styles.version}>Tikara v1.0.0</Text>
             </ScrollView>
         </SafeAreaView>
     );
 }
 
-// --- KOMPONEN ITEM PENGATURAN ---
-const SettingItem = ({ icon, title, onPress, isLogout }) => (
-    <TouchableOpacity style={styles.itemContainer} onPress={onPress} activeOpacity={0.7}>
-        <View style={styles.itemLeft}>
-            <MaterialCommunityIcons
-                name={icon}
-                size={24}
-                color={isLogout ? "#E53935" : "#666"}
-            />
-            <Text style={[styles.itemText, isLogout && { color: '#E53935' }]}>{title}</Text>
+const ProfileMenu = ({ icon, title, onPress }: any) => (
+    <TouchableOpacity style={styles.menuItem} onPress={onPress}>
+        <View style={styles.menuLeft}>
+            <MaterialCommunityIcons name={icon} size={22} color="#333" />
+            <Text style={styles.menuLabel}>{title}</Text>
         </View>
-        <MaterialCommunityIcons
-            name="chevron-right"
-            size={24}
-            color={isLogout ? "#E53935" : "#1E88E5"}
-        />
+        <MaterialCommunityIcons name="chevron-right" size={20} color="#CCC" />
     </TouchableOpacity>
 );
 
-// --- STYLES ---
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FFFFFF' },
-    header: { paddingHorizontal: 20, paddingVertical: 15 },
-    headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#000' },
-
-    profileSection: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        marginVertical: 20
-    },
-    avatarPlaceholder: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: '#E0E0E0',
-        justifyContent: 'center',
-        alignItems: 'center'
-    },
-    userInfo: { marginLeft: 15, flex: 1 },
-    userName: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-    userEmail: { fontSize: 14, color: '#666', marginTop: 2 },
-    joinDate: { fontSize: 11, color: '#A0A0A0', marginTop: 4 },
-
-    settingsSection: { paddingHorizontal: 20, marginTop: 10 },
-    sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#000', marginBottom: 15 },
-
-    itemContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 15,
-        borderBottomWidth: 0,
-    },
-    itemLeft: { flexDirection: 'row', alignItems: 'center', gap: 15 },
-    itemText: { fontSize: 16, color: '#333', fontWeight: '500' }
+    container: { flex: 1, backgroundColor: '#F8F9FA' },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    header: { alignItems: 'center', paddingVertical: 40, backgroundColor: '#FFF' },
+    avatarContainer: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#E3F2FD', justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
+    name: { fontSize: 22, fontWeight: 'bold', color: '#333' },
+    email: { fontSize: 14, color: '#666', marginTop: 5 },
+    organizerBadge: { backgroundColor: '#1E88E5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4, marginTop: 10 },
+    organizerBadgeText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
+    menuContainer: { marginTop: 20, paddingHorizontal: 20 },
+    menuTitle: { fontSize: 12, fontWeight: 'bold', color: '#999', marginBottom: 15, textTransform: 'uppercase', letterSpacing: 1 },
+    menuItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFF', padding: 15, borderRadius: 12, marginBottom: 10, elevation: 1 },
+    menuLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    menuLabel: { fontSize: 15, color: '#333', fontWeight: '500' },
+    divider: { height: 1, backgroundColor: '#EEE', marginVertical: 15 },
+    logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 15, marginBottom: 20 },
+    logoutText: { color: '#E53935', fontWeight: 'bold', fontSize: 16 },
+    version: { textAlign: 'center', color: '#CCC', fontSize: 12, marginBottom: 30 }
 });

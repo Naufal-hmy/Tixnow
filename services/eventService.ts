@@ -1,32 +1,34 @@
 import { supabase } from '../lib/supabase';
 
-// Tipe data untuk event, bisa disesuaikan dengan skema tabel "events" di Supabase
 export interface EventModel {
-  id: string;
+  id: number;
   title: string;
-  organizer: string;
-  date: string;
-  originalPrice: number;
-  discountPrice: number;
   category: string;
-  imageUrl: string;
+  date: string;
+  location: string;
+  price: number;
+  image_url: string;
+  description: string;
+  status: string;
 }
 
 export const eventService = {
-  /**
-   * Mengambil semua data events dari Supabase
-   * @returns {Promise<EventModel[]>} Daftar events
-   */
   async getAllEvents(): Promise<EventModel[]> {
     const { data, error } = await supabase
       .from('events')
-      .select('*');
+      .select('*')
+      .eq('status', 'published')
+      .order('id', { ascending: true });
 
-    if (error) {
-      console.error("Error mengambil data events:", error);
-      throw error;
-    }
+    if (error) throw error;
+    return (data as EventModel[]) || [];
+  },
 
-    return data || [];
+  async createEvent(eventData: Partial<EventModel>) {
+    const { data, error } = await supabase
+      .from('events')
+      .insert([eventData])
+      .select();
+    return { data, error };
   }
 };
